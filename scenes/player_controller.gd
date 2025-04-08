@@ -14,11 +14,12 @@ extends CharacterBody2D
 # Will add climb_speed when we implement climbing mechanics
 
 # Attack parameters
-@export var attack_charge_time = 1  # Time in seconds to charge heavy attack
-@export var max_combo_delay = 0.8     # Maximum time between attacks to continue combo
+@export var attack_charge_time = 0.7  # Time in seconds to charge heavy attack
+@export var max_combo_delay = 0.6     # Maximum time between attacks to continue combo
 
 # Track player state
 var is_attacking = false
+var is_charging_attack = false
 var is_crouching = false
 var is_sliding = false
 var is_rolling = false
@@ -30,11 +31,9 @@ var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 
 # Combat variables
 var current_combo = 0       # Current combo attack (0, 1, 2)
-var max_combo = 2           # Maximum combo attack index (0-based, so 0,1,2 = 3 attacks)
 var combo_timer = 0.0       # Timer for combo window
-var attack_charging = false # Whether heavy attack is charging
 var charge_timer = 0.0      # Timer for charge attack
-var attack_pressed_time = 0.0 # When attack button was pressed
+var next_attack_queued = false # Whether player has queued up the next attack
 
 # Get references to nodes
 @onready var animated_sprite = $AnimatedSprite2D
@@ -46,8 +45,7 @@ func _ready():
 
 func _physics_process(delta):
 	apply_gravity(delta)
-	handle_input()
-	handle_combat(delta)
+	handle_input(delta)
 	apply_movement(delta)
 	update_animations()
 	move_and_slide()
@@ -57,9 +55,42 @@ func apply_gravity(delta):
 	if not is_on_floor() and not is_climbing:
 		velocity.y += gravity * gravity_multiplier * delta
 
-func handle_input():
-	# Only process movement input if not attacking and not rolling
+func handle_input(delta):
+	# Update combo timer
+	if combo_timer > 0:
+		combo_timer -= delta
+		if combo_timer <= 0:
+			current_combo = 0  # Reset combo if time expired
+	
+	# Handle inputs while attacking or rolling
 	if is_attacking or is_rolling:
+		# Handle charging attack while in the charging state
+		if is_charging_attack:
+			charge_timer += delta
+			
+			# If player releases attack button during charge
+			if Input.is_action_just_released("attack"):
+				is_charging_attack = false
+				is_attacking = false
+				
+				if charge_timer >= attack_charge_time:
+					# Fully charged - do heavy attack
+					start_heavy_attack_release()
+				else:
+					# Not fully charged - do attack2
+					start_attack(1)  # Force attack2
+		
+		# Allow queuing up the next attack during current attack animation
+		# But only register one button press, ignore additional mashing
+		elif Input.is_action_just_pressed("attack") and not next_attack_queued:
+			next_attack_queued = true
+		
+		return
+	
+	# If we have a queued attack and previous attack finished, execute it now
+	if next_attack_queued:
+		next_attack_queued = false
+		start_attack() 
 		return
 	
 	# Get horizontal movement input using custom mappings
@@ -85,7 +116,13 @@ func handle_input():
 			jump()
 			has_double_jumped = true
 	
-	# Attack handling moved to handle_combat()
+	# Handle attack
+	if Input.is_action_just_pressed("attack"):
+		# If player taps attack, start normal attack sequence
+		start_attack()
+	elif Input.is_action_pressed("attack") and not is_charging_attack and not is_attacking:
+		# If player is holding attack, start charging
+		start_attack_charge()
 	
 	# Handle sliding with custom slide mapping
 	if Input.is_action_just_pressed("slide") and is_on_floor() and not is_sliding and not is_crouching:
@@ -106,117 +143,66 @@ func handle_input():
 	if Input.is_action_just_pressed("interact"):
 		interact()
 
-func handle_combat(delta):
-	# Decrement combo timer
-	if combo_timer > 0:
-		combo_timer -= delta
-		if combo_timer <= 0:
-			# Reset combo if player waited too long
-			current_combo = 0
-	
-	# Don't process new attacks if already attacking
-	if is_attacking:
-		return
-	
-	# Process attack input
-	if Input.is_action_just_pressed("attack"):
-		attack_pressed_time = Time.get_ticks_msec() / 1000.0
-		
-		# Start charging heavy attack if not already attacking
-		if not is_attacking:
-			attack_charging = true
-			charge_timer = 0.0
-	
-	# Handle charging for heavy attack
-	if attack_charging:
-		if Input.is_action_pressed("attack"):
-			charge_timer += delta
-			# Visual indication of charging could be added here
-		
-		# Release attack button - execute appropriate attack
-		if Input.is_action_just_released("attack"):
-			attack_charging = false
-			
-			# If charged enough, do heavy attack
-			if charge_timer >= attack_charge_time:
-				perform_heavy_attack()
-			else:
-				# Otherwise do next combo attack
-				perform_combo_attack()
-
-func perform_combo_attack():
+func start_attack(forced_combo = -1):
 	is_attacking = true
+	next_attack_queued = false
 	
-	# Determine which animation to play based on combo state
+	# Determine which attack in the combo to use
+	var combo_index = forced_combo if forced_combo >= 0 else current_combo
+	
+	# Select the appropriate animation
 	var attack_anim = ""
-	
 	if is_on_floor():
 		if is_crouching:
 			attack_anim = "crouchattack"
 		else:
-			# Choose the appropriate attack animation based on combo
-			match current_combo:
-				0: attack_anim = "attack1" # Upswing
-				1: attack_anim = "attack2" # Downswing
-				2: attack_anim = "attack3" # Thrust
+			match combo_index:
+				0: attack_anim = "attack1"  # Upswing
+				1: attack_anim = "attack2"  # Downswing
+				2: attack_anim = "attack3"  # Thrust
 	else:
 		attack_anim = "airattack"
 	
-	# Actually play the animation
+	# Play the animation
 	animated_sprite.play(attack_anim)
 	
-	# Apply any attack effects
-	apply_attack_effects(current_combo)
+	# If this isn't a forced attack, advance the combo
+	if forced_combo < 0 and is_on_floor() and not is_crouching:
+		current_combo = (current_combo + 1) % 3  # Cycle through 0,1,2
+		combo_timer = max_combo_delay  # Reset combo timer
 	
-	# Advance combo if on ground and not crouching
-	if is_on_floor() and not is_crouching:
-		current_combo = (current_combo + 1) % (max_combo + 1)
-		combo_timer = max_combo_delay
-	
-	# Wait for animation to finish
+	# Wait for animation to finish before allowing next action
 	await animated_sprite.animation_finished
+	
 	is_attacking = false
 
-func perform_heavy_attack():
+func start_attack_charge():
+	is_attacking = true
+	is_charging_attack = true
+	charge_timer = 0.0
+	
+	# Play the charge animation
+	animated_sprite.play("heavyattackcharge")
+
+func start_heavy_attack_release():
 	is_attacking = true
 	
-	# Play heavy attack animation
+	# Play the appropriate animation
 	if is_on_floor():
 		if is_crouching:
-			animated_sprite.play("crouchattack")  # For now, use same anim
+			animated_sprite.play("crouchattack")  # Fallback for crouching
 		else:
-			animated_sprite.play("attack4")  # Heavy slash
+			animated_sprite.play("heavyattackrelease")
 	else:
-		animated_sprite.play("airattack")  # For now, use same anim
-	
-	# Apply heavy attack effects
-	apply_heavy_attack_effects()
+		animated_sprite.play("airattack")  # Fallback for air
 	
 	# Reset combo
 	current_combo = 0
 	
 	# Wait for animation to finish
 	await animated_sprite.animation_finished
+	
 	is_attacking = false
-
-func apply_attack_effects(combo_index):
-	# This function would apply different effects for each attack in the combo
-	# For example, different damage, knockback, or particle effects
-	match combo_index:
-		0:  # Upswing - quick, low damage
-			print("Upswing attack")
-			# Code for upswing effects
-		1:  # Downswing - medium damage
-			print("Downswing attack")
-			# Code for downswing effects
-		2:  # Thrust - longer reach
-			print("Thrust attack")
-			# Code for thrust effects
-
-func apply_heavy_attack_effects():
-	# Heavy attack effects - high damage, knockback, etc.
-	print("Heavy attack!")
-	# Code for heavy attack effects
 
 func is_near_climbable_object():
 	# This is a placeholder for future implementation
@@ -231,7 +217,11 @@ func interact():
 
 func apply_movement(delta):
 	# Handle horizontal movement
-	if direction != 0 and not is_sliding and not is_rolling and not is_crouching:
+	
+	# If attacking while on the ground, stop horizontal movement
+	if is_attacking and is_on_floor():
+		velocity.x = 0
+	elif direction != 0 and not is_sliding and not is_rolling and not is_crouching:
 		# Determine appropriate acceleration based on whether on floor
 		var current_acceleration = acceleration if is_on_floor() else air_acceleration
 		velocity.x = move_toward(velocity.x, direction * move_speed, current_acceleration)
@@ -258,11 +248,6 @@ func apply_movement(delta):
 func jump():
 	velocity.y = jump_velocity
 	animated_sprite.play("jump")
-
-func attack():
-	# This method is kept for backward compatibility
-	# But main attack logic is now in handle_combat()
-	perform_combo_attack()
 
 func start_slide():
 	is_sliding = true
