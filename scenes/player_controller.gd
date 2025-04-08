@@ -268,7 +268,7 @@ func interact():
 	# This would interact with objects in the game world
 	print("Interacting with nearby object")
 
-func apply_movement(delta):
+func apply_movement(_delta):
 	# Handle horizontal movement
 	
 	# If attacking while on the ground, stop horizontal movement
@@ -325,7 +325,7 @@ func start_roll():
 	await get_tree().create_timer(roll_duration).timeout
 	is_rolling = false
 
-func update_animations(delta):
+func update_animations(_delta):
 	# Don't change animation during an attack, roll or slide
 	if is_attacking or is_rolling or is_sliding:
 		return
