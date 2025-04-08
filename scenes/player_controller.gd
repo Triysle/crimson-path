@@ -11,6 +11,7 @@ extends CharacterBody2D
 @export var roll_speed = 300.0
 @export var roll_duration = 0.5
 @export var slide_duration = 0.7
+# Will add climb_speed when we implement climbing mechanics
 
 # Track player state
 var is_attacking = false
@@ -51,9 +52,19 @@ func handle_input():
 	# Get horizontal movement input using custom mappings
 	direction = Input.get_axis("moveleft", "moveright")
 	
+	# Handle crouching - movedown key when on floor
+	if is_on_floor() and Input.is_action_pressed("movedown"):
+		is_crouching = true
+		# Cancel horizontal movement when crouching
+		direction = 0
+	elif is_on_floor():
+		# Only stop crouching if we're on the floor
+		# This prevents the player from getting stuck in crouching state when jumping
+		is_crouching = false
+	
 	# Handle jumping with custom jump mapping
 	if Input.is_action_just_pressed("jump"):
-		if is_on_floor():
+		if is_on_floor() and not is_crouching: # Don't allow jumping while crouching
 			jump()
 			can_double_jump = true
 			has_double_jumped = false
@@ -66,26 +77,28 @@ func handle_input():
 		attack()
 	
 	# Handle sliding with custom slide mapping
-	if Input.is_action_just_pressed("slide") and is_on_floor() and not is_sliding:
+	if Input.is_action_just_pressed("slide") and is_on_floor() and not is_sliding and not is_crouching:
 		start_slide()
 	
 	# Handle rolling with custom roll mapping
-	if Input.is_action_just_pressed("roll") and is_on_floor() and not is_rolling:
+	if Input.is_action_just_pressed("roll") and is_on_floor() and not is_rolling and not is_crouching:
 		start_roll()
 	
-	# Handle climbing with custom climb mapping
-	# Note: This would need additional collision detection for climb-able objects
-	is_climbing = Input.is_action_pressed("climb") and is_near_climbable_object()
-	if is_climbing:
-		velocity.y = -move_speed * 0.7 if Input.is_action_pressed("climb") else 0
+	# Climbing will be implemented later for ladders, vines, etc.
+	is_climbing = is_near_climbable_object()
+	
+	# For now, just check if we're at a ledge for hanging animation
+	# In a real implementation, you would use raycasts to detect ledges
+	# This is a placeholder until we implement proper ledge detection
 
 	# Handle interaction with custom interact mapping
 	if Input.is_action_just_pressed("interact"):
 		interact()
 
 func is_near_climbable_object():
-	# This is a placeholder. You would need to implement proper detection
-	# of ladder or climbable objects via raycasts or area detection.
+	# This is a placeholder for future implementation
+	# Will be used for ladders, vines, ropes, etc.
+	# Currently we have no climbable objects in the test level
 	return false
 
 func interact():
@@ -93,9 +106,9 @@ func interact():
 	# This would interact with objects in the game world
 	print("Interacting with nearby object")
 
-func apply_movement(delta):
+func apply_movement(_delta):
 	# Handle horizontal movement
-	if direction != 0 and not is_sliding and not is_rolling:
+	if direction != 0 and not is_sliding and not is_rolling and not is_crouching:
 		# Determine appropriate acceleration based on whether on floor
 		var current_acceleration = acceleration if is_on_floor() else air_acceleration
 		velocity.x = move_toward(velocity.x, direction * move_speed, current_acceleration)
@@ -114,6 +127,10 @@ func apply_movement(delta):
 	if is_sliding:
 		# Gradually slow down the slide
 		velocity.x = move_toward(velocity.x, 0, friction * 0.5)
+	
+	# When crouching, ensure we don't move horizontally
+	if is_crouching:
+		velocity.x = 0
 
 func jump():
 	velocity.y = jump_velocity
@@ -159,9 +176,9 @@ func update_animations():
 		return
 	
 	# Handle different states
-	if is_climbing:
-		animated_sprite.play("climb")
-	elif not is_on_floor():
+	if not is_on_floor():
+		# For now, we always use jump animation when in air
+		# We'll implement hanging and climbing animations later
 		animated_sprite.play("jump")
 	else:
 		if is_crouching:
