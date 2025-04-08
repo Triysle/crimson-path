@@ -40,6 +40,7 @@ var current_combo = 0       # Current combo attack (0, 1, 2)
 var combo_timer = 0.0       # Timer for combo window
 var charge_timer = 0.0      # Timer for charge attack
 var next_attack_queued = false # Whether player has queued up the next attack
+var air_attacking = false    # Track if we're currently performing an air attack
 
 # Get references to nodes
 @onready var animated_sprite = $AnimatedSprite2D
@@ -75,6 +76,16 @@ func check_landing():
 	if is_on_floor() and prev_y_velocity > 150:  # If we were falling fast enough
 		just_landed = true
 		land_timer = land_animation_time
+		
+		# Handle landing during an air attack
+		if air_attacking:
+			air_attacking = false
+			is_attacking = true
+			animated_sprite.play("airattackend")
+			
+			# Wait for the airattackend animation to finish
+			await animated_sprite.animation_finished
+			is_attacking = false
 
 func handle_input(delta):
 	# Update combo timer
@@ -192,7 +203,9 @@ func start_attack(forced_combo = -1):
 				1: attack_anim = "attack2"  # Downswing
 				2: attack_anim = "attack3"  # Thrust
 	else:
-		attack_anim = "airattack"
+		# Start air attack
+		attack_anim = "airattackstart"
+		air_attacking = true
 	
 	# Play the animation
 	animated_sprite.play(attack_anim)
@@ -202,10 +215,16 @@ func start_attack(forced_combo = -1):
 		current_combo = (current_combo + 1) % 3  # Cycle through 0,1,2
 		combo_timer = max_combo_delay  # Reset combo timer
 	
-	# Wait for animation to finish before allowing next action
-	await animated_sprite.animation_finished
-	
-	is_attacking = false
+	# Only wait for animation to finish if not air attacking
+	# For air attacks, we'll handle the end in check_landing
+	if not air_attacking:
+		await animated_sprite.animation_finished
+		is_attacking = false
+	else:
+		# For air attacks, we maintain the airattackstart animation
+		# until landing, when it switches to airattackend in check_landing
+		# We don't want to resolve is_attacking here, it will be done in check_landing
+		pass
 
 func start_attack_charge():
 	is_attacking = true
@@ -225,7 +244,10 @@ func start_heavy_attack_release():
 		else:
 			animated_sprite.play("heavyattackrelease")
 	else:
-		animated_sprite.play("airattack")  # Fallback for air
+		# For air heavy attacks, use the same air attack system
+		animated_sprite.play("airattackstart")
+		air_attacking = true
+		return  # Don't await animation, handled by landing
 	
 	# Reset combo
 	current_combo = 0
@@ -306,6 +328,10 @@ func start_roll():
 func update_animations(delta):
 	# Don't change animation during an attack, roll or slide
 	if is_attacking or is_rolling or is_sliding:
+		return
+	
+	# If we're in the middle of an air attack, don't change animation
+	if air_attacking:
 		return
 	
 	# Handle different states
