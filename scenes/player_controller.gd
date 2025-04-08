@@ -29,6 +29,12 @@ var has_double_jumped = false
 var direction = 0
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 
+# Animation state tracking
+var prev_y_velocity = 0
+var just_landed = false
+var land_timer = 0.0
+var land_animation_time = 0.3  # Time to play landing animation
+
 # Combat variables
 var current_combo = 0       # Current combo attack (0, 1, 2)
 var combo_timer = 0.0       # Timer for combo window
@@ -47,13 +53,28 @@ func _physics_process(delta):
 	apply_gravity(delta)
 	handle_input(delta)
 	apply_movement(delta)
-	update_animations()
+	
+	# Store velocity before move_and_slide for landing detection
+	prev_y_velocity = velocity.y
+	
 	move_and_slide()
+	
+	# Check for landing after move_and_slide
+	check_landing()
+	
+	# Update animations after checking landing state
+	update_animations(delta)
 
 func apply_gravity(delta):
 	# Apply gravity when in the air and not climbing
 	if not is_on_floor() and not is_climbing:
 		velocity.y += gravity * gravity_multiplier * delta
+
+func check_landing():
+	# Check if we just landed from a jump or fall
+	if is_on_floor() and prev_y_velocity > 150:  # If we were falling fast enough
+		just_landed = true
+		land_timer = land_animation_time
 
 func handle_input(delta):
 	# Update combo timer
@@ -61,6 +82,12 @@ func handle_input(delta):
 		combo_timer -= delta
 		if combo_timer <= 0:
 			current_combo = 0  # Reset combo if time expired
+	
+	# Handle landing animation timer
+	if land_timer > 0:
+		land_timer -= delta
+		if land_timer <= 0:
+			just_landed = false
 	
 	# Handle inputs while attacking or rolling
 	if is_attacking or is_rolling:
@@ -85,6 +112,10 @@ func handle_input(delta):
 		elif Input.is_action_just_pressed("attack") and not next_attack_queued:
 			next_attack_queued = true
 		
+		return
+	
+	# Don't process movement inputs during landing animation
+	if just_landed:
 		return
 	
 	# If we have a queued attack and previous attack finished, execute it now
@@ -221,11 +252,11 @@ func apply_movement(delta):
 	# If attacking while on the ground, stop horizontal movement
 	if is_attacking and is_on_floor():
 		velocity.x = 0
-	elif direction != 0 and not is_sliding and not is_rolling and not is_crouching:
+	elif direction != 0 and not is_sliding and not is_rolling and not is_crouching and not just_landed:
 		# Determine appropriate acceleration based on whether on floor
 		var current_acceleration = acceleration if is_on_floor() else air_acceleration
 		velocity.x = move_toward(velocity.x, direction * move_speed, current_acceleration)
-	elif not is_sliding and not is_rolling:
+	elif not is_sliding and not is_rolling and not just_landed:
 		# Apply friction/air resistance to slow down
 		var current_friction = friction if is_on_floor() else air_resistance
 		velocity.x = move_toward(velocity.x, 0, current_friction)
@@ -248,6 +279,9 @@ func apply_movement(delta):
 func jump():
 	velocity.y = jump_velocity
 	animated_sprite.play("jump")
+	
+	# Reset just_landed flag when jumping
+	just_landed = false
 
 func start_slide():
 	is_sliding = true
@@ -269,18 +303,26 @@ func start_roll():
 	await get_tree().create_timer(roll_duration).timeout
 	is_rolling = false
 
-func update_animations():
+func update_animations(delta):
 	# Don't change animation during an attack, roll or slide
 	if is_attacking or is_rolling or is_sliding:
 		return
 	
 	# Handle different states
 	if not is_on_floor():
-		# For now, we always use jump animation when in air
-		# We'll implement hanging and climbing animations later
-		animated_sprite.play("jump")
+		# Air animations
+		if velocity.y < 0:
+			# Moving upward - jump animation
+			animated_sprite.play("jump")
+		else:
+			# Moving downward - fall animation
+			animated_sprite.play("fall")
 	else:
-		if is_crouching:
+		# Ground animations
+		if just_landed:
+			# Landing animation
+			animated_sprite.play("land")
+		elif is_crouching:
 			animated_sprite.play("crouch")
 		else:
 			if direction != 0:
