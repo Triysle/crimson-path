@@ -5,8 +5,8 @@ extends CharacterBody2D
 @export var jump_velocity = -350.0
 @export var acceleration = 20.0
 @export var air_acceleration = 10.0
-@export var friction = 10.0
-@export var air_resistance = 5.0
+@export var friction = 30.0  # Increased from 10.0 to reduce sliding
+@export var air_resistance = 10.0  # Increased from 5.0
 @export var gravity_multiplier = 1.0
 @export var roll_speed = 300.0
 @export var roll_duration = 0.5
@@ -33,7 +33,7 @@ var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var prev_y_velocity = 0
 var just_landed = false
 var land_timer = 0.0
-var land_animation_time = 0.3  # Time to play landing animation
+var land_animation_time = 0.2  # Reduced from 0.3 for more responsive controls
 
 # Combat variables
 var current_combo = 0       # Current combo attack (0, 1, 2)
@@ -125,10 +125,6 @@ func handle_input(delta):
 		
 		return
 	
-	# Don't process movement inputs during landing animation
-	if just_landed:
-		return
-	
 	# If we have a queued attack and previous attack finished, execute it now
 	if next_attack_queued:
 		next_attack_queued = false
@@ -141,7 +137,12 @@ func handle_input(delta):
 	# Handle crouching - movedown key when on floor
 	if is_on_floor() and Input.is_action_pressed("movedown"):
 		is_crouching = true
-		# Cancel horizontal movement when crouching
+		# Cancel horizontal movement when crouching, but allow facing changes
+		if direction < 0:
+			animated_sprite.flip_h = true
+		elif direction > 0:
+			animated_sprite.flip_h = false
+		# Zero out velocity for crouching
 		direction = 0
 	elif is_on_floor():
 		# Only stop crouching if we're on the floor
@@ -150,7 +151,8 @@ func handle_input(delta):
 	
 	# Handle jumping with custom jump mapping
 	if Input.is_action_just_pressed("jump"):
-		if is_on_floor() and not is_crouching: # Don't allow jumping while crouching
+		# Don't allow jumping while crouching or during landing animation
+		if is_on_floor() and not is_crouching and not just_landed:
 			jump()
 			can_double_jump = true
 			has_double_jumped = false
@@ -158,29 +160,26 @@ func handle_input(delta):
 			jump()
 			has_double_jumped = true
 	
-	# Handle attack
-	if Input.is_action_just_pressed("attack"):
-		# If player taps attack, start normal attack sequence
-		start_attack()
-	elif Input.is_action_pressed("attack") and not is_charging_attack and not is_attacking:
-		# If player is holding attack, start charging
-		start_attack_charge()
+	# Handle attack - only if not crouching (as requested)
+	if not is_crouching:
+		if Input.is_action_just_pressed("attack"):
+			# If player taps attack, start normal attack sequence
+			start_attack()
+		elif Input.is_action_pressed("attack") and not is_charging_attack and not is_attacking:
+			# If player is holding attack, start charging
+			start_attack_charge()
 	
 	# Handle sliding with custom slide mapping
-	if Input.is_action_just_pressed("slide") and is_on_floor() and not is_sliding and not is_crouching:
+	if Input.is_action_just_pressed("slide") and is_on_floor() and not is_sliding and not is_crouching and not just_landed:
 		start_slide()
 	
 	# Handle rolling with custom roll mapping
-	if Input.is_action_just_pressed("roll") and is_on_floor() and not is_rolling and not is_crouching:
+	if Input.is_action_just_pressed("roll") and is_on_floor() and not is_rolling and not is_crouching and not just_landed:
 		start_roll()
 	
 	# Climbing will be implemented later for ladders, vines, etc.
 	is_climbing = is_near_climbable_object()
 	
-	# For now, just check if we're at a ledge for hanging animation
-	# In a real implementation, you would use raycasts to detect ledges
-	# This is a placeholder until we implement proper ledge detection
-
 	# Handle interaction with custom interact mapping
 	if Input.is_action_just_pressed("interact"):
 		interact()
@@ -195,13 +194,10 @@ func start_attack(forced_combo = -1):
 	# Select the appropriate animation
 	var attack_anim = ""
 	if is_on_floor():
-		if is_crouching:
-			attack_anim = "crouchattack"
-		else:
-			match combo_index:
-				0: attack_anim = "attack1"  # Upswing
-				1: attack_anim = "attack2"  # Downswing
-				2: attack_anim = "attack3"  # Thrust
+		match combo_index:
+			0: attack_anim = "attack1"  # Upswing
+			1: attack_anim = "attack2"  # Downswing
+			2: attack_anim = "attack3"  # Thrust
 	else:
 		# Start air attack
 		attack_anim = "airattackstart"
@@ -211,7 +207,7 @@ func start_attack(forced_combo = -1):
 	animated_sprite.play(attack_anim)
 	
 	# If this isn't a forced attack, advance the combo
-	if forced_combo < 0 and is_on_floor() and not is_crouching:
+	if forced_combo < 0 and is_on_floor():
 		current_combo = (current_combo + 1) % 3  # Cycle through 0,1,2
 		combo_timer = max_combo_delay  # Reset combo timer
 	
@@ -239,10 +235,7 @@ func start_heavy_attack_release():
 	
 	# Play the appropriate animation
 	if is_on_floor():
-		if is_crouching:
-			animated_sprite.play("crouchattack")  # Fallback for crouching
-		else:
-			animated_sprite.play("heavyattackrelease")
+		animated_sprite.play("heavyattackrelease")
 	else:
 		# For air heavy attacks, use the same air attack system
 		animated_sprite.play("airattackstart")
@@ -274,14 +267,18 @@ func apply_movement(_delta):
 	# If attacking while on the ground, stop horizontal movement
 	if is_attacking and is_on_floor():
 		velocity.x = 0
-	elif direction != 0 and not is_sliding and not is_rolling and not is_crouching and not just_landed:
+	elif direction != 0 and not is_sliding and not is_rolling and not is_crouching:
 		# Determine appropriate acceleration based on whether on floor
 		var current_acceleration = acceleration if is_on_floor() else air_acceleration
 		velocity.x = move_toward(velocity.x, direction * move_speed, current_acceleration)
-	elif not is_sliding and not is_rolling and not just_landed:
+	elif not is_sliding and not is_rolling:
 		# Apply friction/air resistance to slow down
 		var current_friction = friction if is_on_floor() else air_resistance
-		velocity.x = move_toward(velocity.x, 0, current_friction)
+		# Apply stronger friction during landing
+		if just_landed:
+			velocity.x = move_toward(velocity.x, 0, friction * 2)
+		else:
+			velocity.x = move_toward(velocity.x, 0, current_friction)
 	
 	# Movement during rolling
 	if is_rolling:
