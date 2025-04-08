@@ -1,5 +1,6 @@
-[gd_scene load_steps=159 format=3 uid="uid://ux55xso6k2ci"]
+[gd_scene load_steps=160 format=3 uid="uid://ux55xso6k2ci"]
 
+[ext_resource type="Script" uid="uid://dk5ysebcgolyx" path="res://scenes/player_controller.gd" id="1_a8ls1"]
 [ext_resource type="Texture2D" uid="uid://hrd54p6rk6w1" path="res://assets/player/attack_from_air.png" id="1_oprun"]
 [ext_resource type="Texture2D" uid="uid://c3m20fr3pkapm" path="res://assets/player/Attacks.png" id="2_a8ls1"]
 [ext_resource type="Texture2D" uid="uid://d24no660j3lxs" path="res://assets/player/Climb.png" id="3_qfm1y"]
@@ -928,7 +929,7 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_y8tjj")
 }],
-"loop": true,
+"loop": false,
 "name": &"idle",
 "speed": 8.0
 }, {
@@ -1085,6 +1086,7 @@ animations = [{
 }]
 
 [node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_a8ls1")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -25)
@@ -1093,6 +1095,9 @@ shape = SubResource("CapsuleShape2D_wqfne")
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -32)
 sprite_frames = SubResource("SpriteFrames_4em36")
-animation = &"slide"
-frame = 6
-frame_progress = 0.266676
+animation = &"idle"
+frame = 7
+frame_progress = 1.0
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)
