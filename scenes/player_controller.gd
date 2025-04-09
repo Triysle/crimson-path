@@ -12,7 +12,8 @@ extends CharacterBody2D
 @export var roll_duration = 0.5
 @export var slide_duration = 0.7
 @export var dive_speed = 350.0  # Speed for dive attack
-# Will add climb_speed when we implement climbing mechanics
+@export var attack_step_distance = 15.0  # Distance to step forward with each attack
+@export var attack_speed_multiplier = 1.5  # Increase animation speed for attacks
 
 # Attack parameters
 @export var attack_charge_time = 0.7  # Time in seconds to charge heavy attack
@@ -34,9 +35,6 @@ var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var is_dive_attacking = false
 var air_combo = 0  # Track air combo for alternating air attacks
 
-# Attack step variables
-var attack_step_distance = 15.0  # Distance to step forward with each attack
-
 # Animation state tracking
 var prev_y_velocity = 0
 var just_landed = false
@@ -49,6 +47,7 @@ var combo_timer = 0.0       # Timer for combo window
 var charge_timer = 0.0      # Timer for charge attack
 var next_attack_queued = false # Whether player has queued up the next attack
 var air_attacking = false    # Track if we're currently performing an air attack
+var can_interrupt_attack = false  # Whether attack can be interrupted for jumping
 
 # Get references to nodes
 @onready var animated_sprite = $AnimatedSprite2D
@@ -103,12 +102,14 @@ func check_landing():
 			is_dive_attacking = false
 			# Keep attacking state true during end animation
 			animated_sprite.play("diveattackend")
+			animated_sprite.speed_scale = attack_speed_multiplier
 			
 			# Wait for the diveattackend animation to finish, but don't block the process
 			var animation_name = animated_sprite.animation
 			animated_sprite.animation_finished.connect(func():
 				if animated_sprite.animation == animation_name:
 					is_attacking = false
+					animated_sprite.speed_scale = 1.0
 			, CONNECT_ONE_SHOT)
 			return  # Skip the air attack landing check
 			
@@ -118,6 +119,7 @@ func check_landing():
 			is_attacking = false  # Immediately reset attacking state
 			# Use the land animation instead of a custom end animation
 			animated_sprite.play("land")
+			animated_sprite.speed_scale = 1.0
 		
 		# Reset air combo when landing
 		air_combo = 0
@@ -135,6 +137,36 @@ func handle_input(delta):
 		if land_timer <= 0:
 			just_landed = false
 	
+	# Always update direction input
+	direction = Input.get_axis("moveleft", "moveright")
+	
+	# Update sprite direction even during attacks to allow changing direction mid-combo
+	if direction < 0:
+		animated_sprite.flip_h = true
+	elif direction > 0:
+		animated_sprite.flip_h = false
+	
+	# Handle jumping, allowing it to interrupt attacks after a brief window
+	if Input.is_action_just_pressed("jump"):
+		# If we're attacking but in the interruptible window
+		if is_attacking and can_interrupt_attack:
+			# Cancel attack and jump
+			is_attacking = false
+			air_attacking = false
+			is_charging_attack = false
+			animated_sprite.speed_scale = 1.0
+			jump()
+			can_double_jump = true
+			has_double_jumped = false
+		# Normal jump logic
+		elif is_on_floor() and not is_crouching and not just_landed:
+			jump()
+			can_double_jump = true
+			has_double_jumped = false
+		elif can_double_jump and not has_double_jumped:
+			jump()
+			has_double_jumped = true
+	
 	# Handle inputs while attacking or rolling
 	if is_attacking or is_rolling:
 		# Handle charging attack while in the charging state
@@ -145,6 +177,7 @@ func handle_input(delta):
 			if Input.is_action_just_released("attack"):
 				is_charging_attack = false
 				is_attacking = false
+				animated_sprite.speed_scale = 1.0
 				
 				if charge_timer >= attack_charge_time:
 					# Fully charged - do heavy attack
@@ -165,6 +198,8 @@ func handle_input(delta):
 				is_attacking = false
 				start_attack()
 		
+		# Still need to handle other inputs like sliding, rolling, etc.
+		# but skip the rest of input processing for now
 		return
 	
 	# If we have a queued attack and previous attack finished, execute it now
@@ -173,34 +208,15 @@ func handle_input(delta):
 		start_attack() 
 		return
 	
-	# Get horizontal movement input using custom mappings
-	direction = Input.get_axis("moveleft", "moveright")
-	
 	# Handle crouching - movedown key when on floor
 	if is_on_floor() and Input.is_action_pressed("movedown"):
 		is_crouching = true
-		# Cancel horizontal movement when crouching, but allow facing changes
-		if direction < 0:
-			animated_sprite.flip_h = true
-		elif direction > 0:
-			animated_sprite.flip_h = false
 		# Zero out velocity for crouching
 		direction = 0
 	elif is_on_floor():
 		# Only stop crouching if we're on the floor
 		# This prevents the player from getting stuck in crouching state when jumping
 		is_crouching = false
-	
-	# Handle jumping with custom jump mapping
-	if Input.is_action_just_pressed("jump"):
-		# Don't allow jumping while crouching or during landing animation
-		if is_on_floor() and not is_crouching and not just_landed:
-			jump()
-			can_double_jump = true
-			has_double_jumped = false
-		elif can_double_jump and not has_double_jumped:
-			jump()
-			has_double_jumped = true
 	
 	# Handle attack - only if not crouching (as requested)
 	if not is_crouching:
@@ -233,6 +249,15 @@ func handle_input(delta):
 func start_attack(forced_combo = -1):
 	is_attacking = true
 	next_attack_queued = false
+	can_interrupt_attack = false
+	
+	# Add a movement impulse based on current direction input
+	if is_on_floor() and direction != 0:
+		var facing_direction = -1 if animated_sprite.flip_h else 1
+		# Only step if moving in same direction as facing
+		if (facing_direction > 0 and direction > 0) or (facing_direction < 0 and direction < 0):
+			# Apply a simple position offset
+			position.x += facing_direction * attack_step_distance
 	
 	# Determine which attack in the combo to use
 	var combo_index = forced_combo if forced_combo >= 0 else current_combo
@@ -244,13 +269,6 @@ func start_attack(forced_combo = -1):
 			0: attack_anim = "attack1"  # Upswing
 			1: attack_anim = "attack2"  # Downswing
 			2: attack_anim = "attack3"  # Thrust
-		
-		# Do a step forward if the player is pressing movement in the facing direction
-		if direction != 0:
-			var facing_direction = -1 if animated_sprite.flip_h else 1
-			if (facing_direction > 0 and direction > 0) or (facing_direction < 0 and direction < 0):
-				# Apply a quick step in the facing direction
-				position.x += facing_direction * attack_step_distance
 	else:
 		# Air attacks alternate between 1 and 2
 		if air_combo == 0:
@@ -262,28 +280,38 @@ func start_attack(forced_combo = -1):
 		
 		air_attacking = true
 	
-	# Play the animation
+	# Play the animation with increased speed
 	animated_sprite.play(attack_anim)
+	animated_sprite.speed_scale = attack_speed_multiplier
 	
 	# If this isn't a forced attack, advance the combo
 	if forced_combo < 0 and is_on_floor():
 		current_combo = (current_combo + 1) % 3  # Cycle through 0,1,2
 		combo_timer = max_combo_delay  # Reset combo timer
 	
+	# Allow jumping after a brief delay (about halfway through the animation)
+	var jump_interrupt_timer = get_tree().create_timer(0.15 / attack_speed_multiplier)
+	jump_interrupt_timer.timeout.connect(func():
+		if is_attacking:
+			can_interrupt_attack = true
+	)
+	
 	# Setup an air attack timer to auto-complete air attacks
 	if air_attacking:
 		# For air attacks, wait for animation to finish, then reset attack state
 		# This ensures we can chain air attacks without getting stuck
-		var animation_timer = get_tree().create_timer(0.3)  # Adjust this to match your animation duration
+		var animation_timer = get_tree().create_timer(0.3 / attack_speed_multiplier)  # Adjust for animation speed
 		animation_timer.timeout.connect(func():
 			if air_attacking and not is_on_floor():
 				is_attacking = false
 				air_attacking = false
+				animated_sprite.speed_scale = 1.0
 		)
 	else:
 		# For ground attacks, wait for full animation to finish
 		await animated_sprite.animation_finished
 		is_attacking = false
+		animated_sprite.speed_scale = 1.0
 
 func start_dive_attack():
 	if is_dive_attacking or is_attacking:
@@ -292,8 +320,9 @@ func start_dive_attack():
 	is_dive_attacking = true
 	is_attacking = true
 	
-	# Play the dive attack start animation
+	# Play the dive attack start animation with increased speed
 	animated_sprite.play("diveattackstart")
+	animated_sprite.speed_scale = attack_speed_multiplier
 	
 	# Override velocity for diving straight down
 	velocity.x = 0
@@ -306,26 +335,46 @@ func start_attack_charge():
 	
 	# Play the charge animation
 	animated_sprite.play("heavyattackcharge")
+	# Don't increase speed for charging, it should feel like holding
 
 func start_heavy_attack_release():
 	is_attacking = true
+	can_interrupt_attack = false
 	
-	# Play the appropriate animation
+	# Add a movement impulse based on current direction input (same as normal attacks)
+	if is_on_floor() and direction != 0:
+		var facing_direction = -1 if animated_sprite.flip_h else 1
+		# Only step if moving in same direction as facing
+		if (facing_direction > 0 and direction > 0) or (facing_direction < 0 and direction < 0):
+			# Apply a simple position offset, slightly more for heavy attack
+			position.x += facing_direction * (attack_step_distance * 1.5)
+	
+	# Play the appropriate animation with increased speed
 	if is_on_floor():
 		animated_sprite.play("heavyattackrelease")
+		animated_sprite.speed_scale = attack_speed_multiplier
 	else:
 		# For air heavy attacks, use the same air attack system
 		animated_sprite.play("airattack1")
+		animated_sprite.speed_scale = attack_speed_multiplier
 		air_attacking = true
 		return  # Don't await animation, handled by landing
 	
 	# Reset combo
 	current_combo = 0
 	
+	# Allow jumping interrupt after a delay
+	var jump_interrupt_timer = get_tree().create_timer(0.2 / attack_speed_multiplier)
+	jump_interrupt_timer.timeout.connect(func():
+		if is_attacking:
+			can_interrupt_attack = true
+	)
+	
 	# Wait for animation to finish
 	await animated_sprite.animation_finished
 	
 	is_attacking = false
+	animated_sprite.speed_scale = 1.0
 
 func is_near_climbable_object():
 	# This is a placeholder for future implementation
@@ -341,11 +390,9 @@ func interact():
 func apply_movement(_delta):
 	# Handle horizontal movement
 	
-	# If dive attacking, stop horizontal movement
-	if is_dive_attacking:
-		velocity.x = 0
-	# When attacking on ground, stop horizontal movement
-	elif is_attacking and is_on_floor():
+	# If attacking while on the ground, stop horizontal movement
+	if is_attacking and is_on_floor():
+		# Force velocity to zero to prevent sliding during attack animations
 		velocity.x = 0
 	elif direction != 0 and not is_sliding and not is_rolling and not is_crouching:
 		# Determine appropriate acceleration based on whether on floor
@@ -432,9 +479,3 @@ func update_animations(_delta):
 				animated_sprite.play("run")
 			else:
 				animated_sprite.play("idle")
-	
-	# Handle sprite flipping (unless in special states)
-	if direction > 0 and not is_rolling and not is_sliding:
-		animated_sprite.flip_h = false
-	elif direction < 0 and not is_rolling and not is_sliding:
-		animated_sprite.flip_h = true

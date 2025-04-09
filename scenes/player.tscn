@@ -976,7 +976,9 @@ animations = [{
 }]
 
 [node name="Player" type="CharacterBody2D"]
+scale = Vector2(1.5, 1.5)
 script = ExtResource("1_a8ls1")
+attack_speed_multiplier = 1.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -25)
@@ -990,10 +992,12 @@ animation = &"airattack1"
 
 [node name="Camera2D" type="Camera2D" parent="."]
 zoom = Vector2(2, 2)
+process_callback = 0
 limit_left = 0
 limit_top = 0
 limit_right = 1152
 limit_bottom = 648
+limit_smoothed = true
 position_smoothing_enabled = true
 position_smoothing_speed = 4.0
 drag_horizontal_enabled = true
