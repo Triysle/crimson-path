@@ -1220,7 +1220,7 @@ position = Vector2(1, 574)
 polygon = PackedVector2Array(-1, 1, -1, 156, 345, 156, 346, -37, 419, -37, 421, 154, 1151, 154, 1151, 1, 566, 1, 526, -30, 503, -30, 423, -94, 336, -94, 300, -62, 241, -62, 191, -31, 176, -31, 140, 1)
 
 [node name="Player" parent="." instance=ExtResource("1_2venv")]
-position = Vector2(594, 278)
+position = Vector2(276, 479)
 
 [node name="ForegroundProps" type="Node2D" parent="."]
 

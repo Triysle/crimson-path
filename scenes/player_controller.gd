@@ -97,6 +97,10 @@ func check_landing():
 		just_landed = true
 		land_timer = land_animation_time
 		
+		# Reset double jump on landing - this is the only place where double jump should be reset
+		can_double_jump = true
+		has_double_jumped = false
+		
 		# Handle landing during a dive attack
 		if is_dive_attacking:
 			is_dive_attacking = false
@@ -148,22 +152,25 @@ func handle_input(delta):
 	
 	# Handle jumping, allowing it to interrupt attacks after a brief window
 	if Input.is_action_just_pressed("jump"):
-		# If we're attacking but in the interruptible window
-		if is_attacking and can_interrupt_attack:
+		# If we're attacking but in the interruptible window and on the ground
+		if is_attacking and can_interrupt_attack and is_on_floor():
 			# Cancel attack and jump
 			is_attacking = false
 			air_attacking = false
 			is_charging_attack = false
 			animated_sprite.speed_scale = 1.0
 			jump()
-			can_double_jump = true
-			has_double_jumped = false
-		# Normal jump logic
-		elif is_on_floor() and not is_crouching and not just_landed:
+		# Jump down through platforms if pressing down + jump while on a one-way platform
+		elif is_on_floor() and Input.is_action_pressed("movedown"):
+			# Set collision layer to temporarily pass through one-way platforms
+			position.y += 1  # Move down slightly to avoid getting stuck
+		# Normal jump logic - removed "not just_landed" to fix sticky jumping
+		elif is_on_floor() and not is_crouching:
 			jump()
 			can_double_jump = true
 			has_double_jumped = false
-		elif can_double_jump and not has_double_jumped:
+		# Double jump only if we haven't used it already and not in the middle of an air attack
+		elif can_double_jump and not has_double_jumped and not air_attacking:
 			jump()
 			has_double_jumped = true
 	
@@ -428,6 +435,10 @@ func jump():
 	
 	# Reset just_landed flag when jumping
 	just_landed = false
+	
+	# If we're jumping from an attack, make sure we can't chain with double jump
+	if air_attacking or is_attacking:
+		can_double_jump = false
 
 func start_slide():
 	is_sliding = true

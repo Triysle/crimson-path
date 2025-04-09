@@ -980,7 +980,7 @@ animations = [{
 scale = Vector2(1.5, 1.5)
 script = ExtResource("1_a8ls1")
 dive_speed = 500.0
-attack_speed_multiplier = 1.0
+attack_speed_multiplier = 1.2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -25)
@@ -1009,6 +1009,7 @@ drag_vertical_offset = 0.1
 editor_draw_limits = true
 
 [node name="TrailEffect" type="Node2D" parent="."]
+visible = false
 script = ExtResource("17_qfm1y")
 trail_length = 3
 fade_time = 0.2
