@@ -1,4 +1,4 @@
-[gd_scene load_steps=136 format=3 uid="uid://ux55xso6k2ci"]
+[gd_scene load_steps=137 format=3 uid="uid://ux55xso6k2ci"]
 
 [ext_resource type="Script" uid="uid://dk5ysebcgolyx" path="res://scenes/player_controller.gd" id="1_a8ls1"]
 [ext_resource type="Texture2D" uid="uid://hrd54p6rk6w1" path="res://assets/player/attack_from_air.png" id="1_oprun"]
@@ -16,6 +16,7 @@
 [ext_resource type="Texture2D" uid="uid://cts1dcmrxekok" path="res://assets/player/Roll.png" id="13_31cv2"]
 [ext_resource type="Texture2D" uid="uid://d1kkhc8povaut" path="res://assets/player/Run.png" id="14_pf23h"]
 [ext_resource type="Texture2D" uid="uid://kbma6uy4tmbo" path="res://assets/player/Slide.png" id="15_dt7fs"]
+[ext_resource type="Script" uid="uid://c6idh8g0872p2" path="res://scenes/trail_effect.gd" id="17_qfm1y"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_wqfne"]
 height = 50.0
@@ -1005,3 +1006,8 @@ drag_vertical_enabled = true
 drag_horizontal_offset = 0.1
 drag_vertical_offset = 0.1
 editor_draw_limits = true
+
+[node name="TrailEffect" type="Node2D" parent="."]
+script = ExtResource("17_qfm1y")
+trail_length = 3
+fade_time = 0.2
