@@ -979,6 +979,7 @@ animations = [{
 [node name="Player" type="CharacterBody2D"]
 scale = Vector2(1.5, 1.5)
 script = ExtResource("1_a8ls1")
+dive_speed = 500.0
 attack_speed_multiplier = 1.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
