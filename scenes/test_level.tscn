@@ -1142,28 +1142,30 @@ sprite_frames = SubResource("SpriteFrames_3gbgl")
 animation = &"water"
 autoplay = "water"
 
-[node name="Tree1" type="AnimatedSprite2D" parent="Background Props"]
+[node name="Trees" type="Node2D" parent="Background Props"]
+
+[node name="Tree1" type="AnimatedSprite2D" parent="Background Props/Trees"]
 position = Vector2(113, 358)
 scale = Vector2(1.32813, 1.35938)
 sprite_frames = SubResource("SpriteFrames_3gbgl")
 animation = &"darktree1"
 autoplay = "darktree1"
 
-[node name="Tree2" type="AnimatedSprite2D" parent="Background Props"]
+[node name="Tree2" type="AnimatedSprite2D" parent="Background Props/Trees"]
 position = Vector2(1034, 387)
 scale = Vector2(1.32813, 1.35938)
 sprite_frames = SubResource("SpriteFrames_3gbgl")
 animation = &"darktree2"
 autoplay = "darktree2"
 
-[node name="Tree3" type="AnimatedSprite2D" parent="Background Props"]
+[node name="Tree3" type="AnimatedSprite2D" parent="Background Props/Trees"]
 position = Vector2(377, 348)
 scale = Vector2(1.32813, 1.35938)
 sprite_frames = SubResource("SpriteFrames_3gbgl")
 animation = &"darktree3"
 autoplay = "darktree3"
 
-[node name="Tree4" type="AnimatedSprite2D" parent="Background Props"]
+[node name="Tree4" type="AnimatedSprite2D" parent="Background Props/Trees"]
 position = Vector2(685, 478)
 scale = Vector2(1.84375, 1.5)
 sprite_frames = SubResource("SpriteFrames_3gbgl")
@@ -1206,6 +1208,62 @@ one_way_collision = true
 position = Vector2(-703, -288)
 polygon = PackedVector2Array(927, 481, 960, 508, 1025, 508, 1055, 481)
 one_way_collision = true
+
+[node name="Plants" type="Node2D" parent="Platforms"]
+
+[node name="Plant1" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(265, 179)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant1"
+autoplay = "plant1"
+
+[node name="Plant2" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(336, 179)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant2"
+autoplay = "plant2"
+
+[node name="Plant3" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(160, 275)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant3"
+autoplay = "plant3"
+
+[node name="Plant4" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(371, 339)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant1"
+autoplay = "plant1"
+
+[node name="Plant5" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(515, 371)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant3"
+autoplay = "plant3"
+
+[node name="Plant6" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(590, 371)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant2"
+autoplay = "plant2"
+
+[node name="Plant7" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(790, 436)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant2"
+autoplay = "plant2"
+
+[node name="Plant8" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(960, 469)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant3"
+autoplay = "plant3"
+
+[node name="Plant9" type="AnimatedSprite2D" parent="Platforms/Plants"]
+position = Vector2(1037, 469)
+sprite_frames = SubResource("SpriteFrames_78coo")
+animation = &"plant1"
+autoplay = "plant1"
 
 [node name="Ground" type="StaticBody2D" parent="."]
 
@@ -1363,62 +1421,6 @@ position = Vector2(1098, 47)
 sprite_frames = SubResource("SpriteFrames_78coo")
 animation = &"grass2"
 autoplay = "grass2"
-
-[node name="Plants" type="Node2D" parent="ForegroundProps"]
-
-[node name="Plant1" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(265, 179)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant1"
-autoplay = "plant1"
-
-[node name="Plant2" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(336, 179)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant2"
-autoplay = "plant2"
-
-[node name="Plant3" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(160, 275)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant3"
-autoplay = "plant3"
-
-[node name="Plant4" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(371, 339)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant1"
-autoplay = "plant1"
-
-[node name="Plant5" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(515, 371)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant3"
-autoplay = "plant3"
-
-[node name="Plant6" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(590, 371)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant2"
-autoplay = "plant2"
-
-[node name="Plant7" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(790, 436)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant2"
-autoplay = "plant2"
-
-[node name="Plant8" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(960, 469)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant3"
-autoplay = "plant3"
-
-[node name="Plant9" type="AnimatedSprite2D" parent="ForegroundProps/Plants"]
-position = Vector2(1037, 469)
-sprite_frames = SubResource("SpriteFrames_78coo")
-animation = &"plant1"
-autoplay = "plant1"
 
 [node name="WorldBoundaries" type="Node2D" parent="."]
 
